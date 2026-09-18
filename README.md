@@ -3,7 +3,10 @@
 PHP SDK for the [YClients REST API](https://developers.yclients.com/ru/) — companies, staff,
 clients, records, auth.
 
-Status: infrastructure only, no client code yet.
+Framework-agnostic: talks PSR-18 (`psr/http-client`) + PSR-17 (`psr/http-factory`) rather than a
+specific HTTP client. Your app needs an implementation of both installed (e.g. `guzzlehttp/guzzle`
++ `guzzlehttp/psr7`, or `symfony/http-client`'s `Psr18Client`) — `php-http/discovery` finds it
+automatically, or pass your own client/factories to `YclientsClient`'s constructor explicitly.
 
 ## Installation
 

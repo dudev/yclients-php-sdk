@@ -6,17 +6,19 @@ namespace Dudev\YclientsPhpSdk\Tests\Staff;
 
 use Dudev\YclientsPhpSdk\Staff\StaffApi;
 use Dudev\YclientsPhpSdk\Transport;
+use Http\Mock\Client;
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class StaffApiTest extends TestCase
 {
     #[Test]
     public function listParsesPositionAndRating(): void
     {
-        $httpClient = new MockHttpClient(new MockResponse(json_encode([
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
             'success' => true,
             'data' => [
                 [
@@ -31,7 +33,14 @@ final class StaffApiTest extends TestCase
             ],
             'meta' => [],
         ], JSON_THROW_ON_ERROR)));
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $psr17 = new Psr17Factory();
+        $transport = new Transport(
+            partnerToken: 'partner',
+            httpClient: $httpClient,
+            requestFactory: $psr17,
+            streamFactory: $psr17,
+            throttle: null,
+        );
 
         $staff = (new StaffApi($transport))->list(622905);
 

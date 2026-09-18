@@ -7,20 +7,20 @@ namespace Dudev\YclientsPhpSdk\Tests;
 use Dudev\YclientsPhpSdk\Exception\YclientsApiException;
 use Dudev\YclientsPhpSdk\Exception\YclientsRateLimitException;
 use Dudev\YclientsPhpSdk\Transport;
+use Http\Mock\Client;
+use Nyholm\Psr7\Factory\Psr17Factory;
+use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class TransportTest extends TestCase
 {
     #[Test]
     public function itUnwrapsTheSuccessEnvelope(): void
     {
-        $httpClient = new MockHttpClient(new MockResponse(
-            json_encode(['success' => true, 'data' => ['id' => 42, 'title' => 'Салон'], 'meta' => []], JSON_THROW_ON_ERROR),
-        ));
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => ['id' => 42, 'title' => 'Салон'], 'meta' => []], JSON_THROW_ON_ERROR)));
+        $transport = $this->transport($httpClient);
 
         $data = $transport->request('GET', '/api/v1/companies/42');
 
@@ -30,33 +30,31 @@ final class TransportTest extends TestCase
     #[Test]
     public function itSendsThePartnerOnlyAuthorizationHeaderByDefault(): void
     {
-        $httpClient = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
-            self::assertSame('Bearer partner', $this->findHeader($options, 'Authorization'));
-
-            return new MockResponse(json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR));
-        });
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR)));
+        $transport = $this->transport($httpClient);
 
         $transport->request('GET', '/api/v1/companies');
+
+        self::assertSame('Bearer partner', $httpClient->getLastRequest()->getHeaderLine('Authorization'));
     }
 
     #[Test]
     public function itAddsTheUserTokenWhenRequired(): void
     {
-        $httpClient = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
-            self::assertSame('Bearer partner, User user', $this->findHeader($options, 'Authorization'));
-
-            return new MockResponse(json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR));
-        });
-        $transport = new Transport($httpClient, partnerToken: 'partner', userToken: 'user', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR)));
+        $transport = $this->transport($httpClient, userToken: 'user');
 
         $transport->request('GET', '/api/v1/records/1', requireUserToken: true);
+
+        self::assertSame('Bearer partner, User user', $httpClient->getLastRequest()->getHeaderLine('Authorization'));
     }
 
     #[Test]
     public function itThrowsALogicExceptionWhenAUserTokenIsRequiredButMissing(): void
     {
-        $transport = new Transport(new MockHttpClient(), partnerToken: 'partner', throttle: null);
+        $transport = $this->transport(new Client());
 
         $this->expectException(\LogicException::class);
 
@@ -66,11 +64,9 @@ final class TransportTest extends TestCase
     #[Test]
     public function itThrowsOnSuccessFalse(): void
     {
-        $httpClient = new MockHttpClient(new MockResponse(
-            json_encode(['success' => false, 'data' => null, 'meta' => ['message' => 'бред какой-то']], JSON_THROW_ON_ERROR),
-            ['http_code' => 200],
-        ));
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => false, 'data' => null, 'meta' => ['message' => 'бред какой-то']], JSON_THROW_ON_ERROR)));
+        $transport = $this->transport($httpClient);
 
         try {
             $transport->request('GET', '/api/v1/companies');
@@ -83,11 +79,9 @@ final class TransportTest extends TestCase
     #[Test]
     public function itThrowsOnTheErrorsEnvelopeShapeSeenOn401And404(): void
     {
-        $httpClient = new MockHttpClient(new MockResponse(
-            json_encode(['errors' => ['code' => 404, 'message' => 'Не найдено'], 'meta' => ['message' => 'Не найдено']], JSON_THROW_ON_ERROR),
-            ['http_code' => 404],
-        ));
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(404, [], json_encode(['errors' => ['code' => 404, 'message' => 'Не найдено'], 'meta' => ['message' => 'Не найдено']], JSON_THROW_ON_ERROR)));
+        $transport = $this->transport($httpClient);
 
         try {
             $transport->request('GET', '/api/v1/company/999999/');
@@ -101,8 +95,9 @@ final class TransportTest extends TestCase
     #[Test]
     public function itThrowsATypedExceptionOn429(): void
     {
-        $httpClient = new MockHttpClient(new MockResponse('', ['http_code' => 429]));
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(429));
+        $transport = $this->transport($httpClient);
 
         $this->expectException(YclientsRateLimitException::class);
 
@@ -112,25 +107,24 @@ final class TransportTest extends TestCase
     #[Test]
     public function itReturnsAnEmptyArrayForANoContentResponse(): void
     {
-        $httpClient = new MockHttpClient(new MockResponse('', ['http_code' => 204]));
-        $transport = new Transport($httpClient, partnerToken: 'partner', throttle: null);
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(204));
+        $transport = $this->transport($httpClient);
 
         self::assertSame([], $transport->request('DELETE', '/api/v1/client/1/2', requireUserToken: false));
     }
 
-    /** @param array<string, mixed> $options */
-    private function findHeader(array $options, string $name): ?string
+    private function transport(Client $httpClient, ?string $userToken = null): Transport
     {
-        /** @var mixed $normalizedHeaders */
-        $normalizedHeaders = $options['normalized_headers'] ?? [];
-        /** @var list<string> $headers */
-        $headers = is_array($normalizedHeaders) ? ($normalizedHeaders[strtolower($name)] ?? []) : [];
-        foreach ($headers as $header) {
-            if (str_starts_with($header, $name . ':')) {
-                return trim(substr($header, strlen($name) + 1));
-            }
-        }
+        $psr17 = new Psr17Factory();
 
-        return null;
+        return new Transport(
+            partnerToken: 'partner',
+            httpClient: $httpClient,
+            userToken: $userToken,
+            requestFactory: $psr17,
+            streamFactory: $psr17,
+            throttle: null,
+        );
     }
 }

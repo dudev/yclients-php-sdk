@@ -7,30 +7,50 @@ namespace Dudev\YclientsPhpSdk;
 use Dudev\YclientsPhpSdk\Exception\YclientsApiException;
 use Dudev\YclientsPhpSdk\Exception\YclientsException;
 use Dudev\YclientsPhpSdk\Exception\YclientsRateLimitException;
-use Dudev\YclientsPhpSdk\RateLimit\Throttle;
 use Dudev\YclientsPhpSdk\Http\RawResponse;
-use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientExceptionInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Dudev\YclientsPhpSdk\RateLimit\Throttle;
+use Http\Discovery\Psr17FactoryDiscovery;
+use Http\Discovery\Psr18ClientDiscovery;
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 
 /**
- * Everything every `*Api` class needs to actually call YClients: builds the URL/headers, throttles,
+ * Everything every `*Api` class needs to actually call YClients: builds the request, throttles,
  * unwraps the `{success, data, meta}` envelope (or the differently-shaped `{errors, meta}` one seen
  * on 401/404 — YClients isn't consistent between the two, see `YclientsApiException`), and maps
  * failures to typed exceptions. Not part of the public API surface directly — reach it only through
  * `YclientsClient`'s `*Api` accessors.
+ *
+ * Talks PSR-18 (`ClientInterface`) + PSR-17 (`RequestFactoryInterface`/`StreamFactoryInterface`)
+ * rather than a specific HTTP client library, since this SDK is meant to be usable from any PHP
+ * app, not just Symfony ones. Any of the three can be passed explicitly (e.g. to reuse an app's
+ * existing Guzzle/Symfony client); omitted ones fall back to whatever `php-http/discovery` finds
+ * installed — the consuming app still needs *some* PSR-18 client + PSR-17 factories present.
  */
 final class Transport
 {
     private const BASE_URI = 'https://api.yclients.ru';
 
+    private readonly string $partnerToken;
     private ?string $userToken;
+    private readonly ClientInterface $httpClient;
+    private readonly RequestFactoryInterface $requestFactory;
+    private readonly StreamFactoryInterface $streamFactory;
 
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
-        private readonly string $partnerToken,
+        string $partnerToken,
+        ?ClientInterface $httpClient = null,
         ?string $userToken = null,
+        ?RequestFactoryInterface $requestFactory = null,
+        ?StreamFactoryInterface $streamFactory = null,
         private readonly ?Throttle $throttle = new Throttle(),
     ) {
+        $this->partnerToken = $partnerToken;
+        $this->httpClient = $httpClient ?? Psr18ClientDiscovery::find();
+        $this->requestFactory = $requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
+        $this->streamFactory = $streamFactory ?? Psr17FactoryDiscovery::findStreamFactory();
         $this->userToken = $userToken;
     }
 
@@ -78,31 +98,33 @@ final class Transport
     ): RawResponse {
         $this->throttle?->wait();
 
-        $options = [
-            'headers' => [
-                'Accept' => 'application/vnd.yclients.v2+json',
-                'Content-Type' => 'application/json',
-                'Authorization' => $this->authorizationHeader($requireUserToken),
-            ],
-        ];
+        $uri = self::BASE_URI . $path;
         if ($query !== []) {
-            $options['query'] = $query;
+            $uri .= '?' . http_build_query($query);
         }
+
+        $request = $this->requestFactory->createRequest($method, $uri)
+            ->withHeader('Accept', 'application/vnd.yclients.v2+json')
+            ->withHeader('Content-Type', 'application/json')
+            ->withHeader('Authorization', $this->authorizationHeader($requireUserToken));
+
         if ($json !== null) {
-            $options['json'] = $json;
+            $request = $request->withBody($this->streamFactory->createStream(json_encode($json, JSON_THROW_ON_ERROR)));
         }
 
         try {
-            $response = $this->httpClient->request($method, self::BASE_URI . $path, $options);
-            $statusCode = $response->getStatusCode();
-            $rawBody = $response->getContent(false);
-        } catch (HttpClientExceptionInterface $e) {
+            $response = $this->httpClient->sendRequest($request);
+        } catch (ClientExceptionInterface $e) {
             throw new YclientsException(sprintf('HTTP transport error calling %s %s', $method, $path), previous: $e);
         }
+
+        $statusCode = $response->getStatusCode();
 
         if ($statusCode === 429) {
             throw new YclientsRateLimitException($method, $path);
         }
+
+        $rawBody = $response->getBody()->getContents();
 
         // 204/DELETE responses have no body — nothing to unwrap, no error to check beyond the status.
         if ($rawBody === '') {

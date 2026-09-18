@@ -10,7 +10,9 @@ use Dudev\YclientsPhpSdk\Company\CompanyApi;
 use Dudev\YclientsPhpSdk\RateLimit\Throttle;
 use Dudev\YclientsPhpSdk\Record\RecordApi;
 use Dudev\YclientsPhpSdk\Staff\StaffApi;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 
 /**
  * Entry point — one instance per `partner_token` (+ optional `user_token`, see {@see self::auth()}).
@@ -30,14 +32,21 @@ final class YclientsClient
      * $userToken can be omitted and obtained later via `auth()->authenticate()`, or passed directly
      * if you already have a stored session for this user — either way it's mutable afterwards
      * (`setUserToken()`), since a real login session outlives the token you start with.
+     *
+     * $httpClient/$requestFactory/$streamFactory are all optional — pass your app's own PSR-18
+     * client / PSR-17 factories to reuse them, or leave them out and `php-http/discovery` picks
+     * whatever is installed. Either way, the app needs *some* PSR-18 + PSR-17 implementation
+     * present (e.g. `guzzlehttp/guzzle` + `guzzlehttp/psr7`, or Symfony's `Psr18Client`).
      */
     public function __construct(
-        HttpClientInterface $httpClient,
         string $partnerToken,
+        ?ClientInterface $httpClient = null,
         ?string $userToken = null,
+        ?RequestFactoryInterface $requestFactory = null,
+        ?StreamFactoryInterface $streamFactory = null,
         ?Throttle $throttle = new Throttle(),
     ) {
-        $this->transport = new Transport($httpClient, $partnerToken, $userToken, $throttle);
+        $this->transport = new Transport($partnerToken, $httpClient, $userToken, $requestFactory, $streamFactory, $throttle);
     }
 
     public function getUserToken(): ?string
