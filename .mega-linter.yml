@@ -1,0 +1,9 @@
+# https://megalinter.io/latest/config-file/
+APPLY_FIXES: none
+FILTER_REGEX_EXCLUDE: "(vendor/|megalinter-reports/)"
+DISABLE:
+  # Noisy on Russian-language docs (see docs/scope.md) without a custom dictionary.
+  - SPELL
+  # Low value on a small, young repo — mostly flags intentionally similar test fixtures.
+  - COPYPASTE
+PRINT_ALPACA: false

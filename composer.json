@@ -1,0 +1,36 @@
+{
+    "name": "dudev/yclients-php-sdk",
+    "description": "PHP SDK for the YClients REST API (https://developers.yclients.com/ru/)",
+    "type": "library",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "dudev"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "psr/log": "^3.0",
+        "symfony/http-client": "^6.4 || ^7.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dudev\\YclientsPhpSdk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dudev\\YclientsPhpSdk\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
