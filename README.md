@@ -1,7 +1,7 @@
 # yclients-php-sdk
 
 PHP SDK for the [YClients REST API](https://developers.yclients.com/ru/) — companies, staff,
-clients, records, auth. See [`docs/scope.md`](docs/scope.md) for what's planned and why.
+clients, records, auth.
 
 Status: infrastructure only, no client code yet.
 
