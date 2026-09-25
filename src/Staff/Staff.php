@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Staff;
 
+use Dudev\YclientsPhpSdk\RequiredField;
+
 /** `GET /api/v1/staff/{company_id}[/{staff_id}]` — fields confirmed against real webhook payloads and the API docs. */
 final readonly class Staff
 {
@@ -27,8 +29,8 @@ final readonly class Staff
         $positionTitle = is_array($position) && is_string($position['title'] ?? null) ? $position['title'] : null;
 
         return new self(
-            id: is_numeric($data['id'] ?? null) ? (int) $data['id'] : 0,
-            name: is_scalar($data['name'] ?? null) ? (string) $data['name'] : '',
+            id: RequiredField::int($data, 'id', self::class),
+            name: RequiredField::string($data, 'name', self::class),
             specialization: is_string($data['specialization'] ?? null) ? $data['specialization'] : null,
             positionTitle: $positionTitle,
             avatar: is_string($data['avatar'] ?? null) ? $data['avatar'] : null,

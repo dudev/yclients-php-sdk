@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Record;
 
+use Dudev\YclientsPhpSdk\Exception\YclientsMalformedPayloadException;
+use Dudev\YclientsPhpSdk\RequiredField;
+
 /** `GET /api/v1/records/{company_id}`, `GET /api/v1/record/{company_id}/{record_id}`. */
 final readonly class Record
 {
@@ -45,19 +48,26 @@ final readonly class Record
             ))
             : [];
 
+        /** @var mixed $rawAttendance */
+        $rawAttendance = RequiredField::key($data, 'attendance', self::class);
+
         return new self(
-            id: is_numeric($data['id'] ?? null) ? (int) $data['id'] : 0,
-            companyId: is_numeric($data['company_id'] ?? null) ? (int) $data['company_id'] : 0,
+            id: RequiredField::int($data, 'id', self::class),
+            companyId: RequiredField::int($data, 'company_id', self::class),
             staffId: is_numeric($data['staff_id'] ?? null) ? (int) $data['staff_id'] : null,
             clientId: $clientId,
-            datetime: self::parseDate($data['datetime'] ?? null) ?? new \DateTimeImmutable('@0'),
+            datetime: self::parseDate($data['datetime'] ?? null) ?? throw new YclientsMalformedPayloadException(self::class, 'datetime'),
             createDate: self::parseDate($data['create_date'] ?? null),
             lastChangeDate: self::parseDate($data['last_change_date'] ?? null),
             comment: is_string($data['comment'] ?? null) ? $data['comment'] : null,
             online: (bool) ($data['online'] ?? false),
             visitId: is_numeric($data['visit_id'] ?? null) ? (int) $data['visit_id'] : null,
-            attendance: Attendance::tryFrom(is_numeric($data['attendance'] ?? null) ? (int) $data['attendance'] : 0) ?? Attendance::Awaiting,
-            seanceLengthSeconds: self::firstNumeric($data['seance_length'] ?? null, $data['length'] ?? null),
+            // An unrecognized *code* degrades to Awaiting on purpose (forward-compat with a future
+            // YClients status this SDK doesn't know about yet) — but the key itself must exist,
+            // asserted above via RequiredField::key().
+            attendance: Attendance::tryFrom(is_numeric($rawAttendance) ? (int) $rawAttendance : 0) ?? Attendance::Awaiting,
+            seanceLengthSeconds: self::firstNumeric($data['seance_length'] ?? null, $data['length'] ?? null)
+                ?? throw new YclientsMalformedPayloadException(self::class, 'seance_length'),
             deleted: (bool) ($data['deleted'] ?? false),
             paidFull: (bool) ($data['paid_full'] ?? false),
             services: $services,
@@ -82,7 +92,7 @@ final readonly class Record
         return $date !== false ? $date : null;
     }
 
-    private static function firstNumeric(mixed ...$candidates): int
+    private static function firstNumeric(mixed ...$candidates): ?int
     {
         foreach ($candidates as $candidate) {
             if (is_numeric($candidate)) {
@@ -90,6 +100,6 @@ final readonly class Record
             }
         }
 
-        return 0;
+        return null;
     }
 }

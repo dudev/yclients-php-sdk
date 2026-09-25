@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Client;
 
+use Dudev\YclientsPhpSdk\RequiredField;
+
 /**
  * `GET /api/v1/clients/{company_id}`, `GET /api/v1/client/{company_id}/{id}` — a YClients customer.
  * Fields confirmed against real webhook payloads and the API docs (see `yclients-clients-design.md`
@@ -59,8 +61,8 @@ final readonly class Client
         $customFields = is_array($rawCustomFields) ? $rawCustomFields : [];
 
         return new self(
-            id: is_numeric($data['id'] ?? null) ? (int) $data['id'] : 0,
-            name: is_scalar($data['name'] ?? null) ? (string) $data['name'] : '',
+            id: RequiredField::int($data, 'id', self::class),
+            name: RequiredField::string($data, 'name', self::class),
             surname: self::nonEmptyString($data['surname'] ?? null),
             patronymic: self::nonEmptyString($data['patronymic'] ?? null),
             displayName: self::nonEmptyString($data['display_name'] ?? null),

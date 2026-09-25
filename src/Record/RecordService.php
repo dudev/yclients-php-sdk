@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Record;
 
+use Dudev\YclientsPhpSdk\RequiredField;
+
 /** One line of `Record::$services` — a service rendered during the visit. */
 final readonly class RecordService
 {
@@ -20,8 +22,8 @@ final readonly class RecordService
     public static function fromArray(array $data): self
     {
         return new self(
-            id: is_numeric($data['id'] ?? null) ? (int) $data['id'] : 0,
-            title: is_scalar($data['title'] ?? null) ? (string) $data['title'] : '',
+            id: RequiredField::int($data, 'id', self::class),
+            title: RequiredField::string($data, 'title', self::class),
             // YClients' money fields are whole rubles, not kopeks, everywhere this was directly
             // confirmed (client.spent/client.balance/client.discount, see yclients-clients-design.md)
             // — "cost"/"cost_to_pay" here weren't independently confirmed the same way, only inferred

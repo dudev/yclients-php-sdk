@@ -31,10 +31,10 @@ final class RecordApiTest extends TestCase
     public function getAllStopsAsSoonAsAPageComesBackShortOfTheFullPageSize(): void
     {
         $fullPage = array_map(
-            static fn (int $i): array => ['id' => $i, 'company_id' => 1],
+            static fn (int $i): array => self::minimalRecordData($i),
             range(1, 200),
         );
-        $shortPage = [['id' => 201, 'company_id' => 1]];
+        $shortPage = [self::minimalRecordData(201)];
 
         $httpClient = new Client();
         $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => $fullPage, 'meta' => []], JSON_THROW_ON_ERROR)));
@@ -65,7 +65,7 @@ final class RecordApiTest extends TestCase
         $httpClient = new Client();
         $httpClient->addResponse(new Response(200, [], json_encode([
             'success' => true,
-            'data' => ['id' => 42, 'company_id' => 622905, 'comment' => 'Заметка'],
+            'data' => self::minimalRecordData(42) + ['comment' => 'Заметка'],
             'meta' => [],
         ], JSON_THROW_ON_ERROR)));
         $transport = self::transport($httpClient, userToken: 'user');
@@ -74,6 +74,18 @@ final class RecordApiTest extends TestCase
 
         self::assertSame(42, $record->id);
         self::assertSame('Заметка', $record->comment);
+    }
+
+    /** @return array<string, mixed> */
+    private static function minimalRecordData(int $id): array
+    {
+        return [
+            'id' => $id,
+            'company_id' => 1,
+            'datetime' => '2026-09-16T19:30:00+05:00',
+            'attendance' => 0,
+            'seance_length' => 3600,
+        ];
     }
 
     private static function transport(Client $httpClient, ?string $userToken = null): Transport

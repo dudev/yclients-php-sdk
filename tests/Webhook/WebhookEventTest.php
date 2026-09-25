@@ -154,7 +154,14 @@ final class WebhookEventTest extends TestCase
             'resource' => 'record',
             'resource_id' => 1900413435,
             'status' => 'delete',
-            'data' => ['id' => 1900413435, 'company_id' => 622905, 'deleted' => true],
+            'data' => [
+                'id' => 1900413435,
+                'company_id' => 622905,
+                'deleted' => true,
+                'datetime' => '2026-08-18T13:00:00+05:00',
+                'attendance' => 2,
+                'seance_length' => 4500,
+            ],
         ]);
 
         self::assertSame(WebhookStatus::Delete, $event->status);
