@@ -21,20 +21,23 @@ final class CompanyApiTest extends TestCase
         $httpClient->addResponse(new Response(200, [], json_encode([
             'success' => true,
             'data' => [
-                ['id' => 1, 'title' => 'Мамина-Сибиряка', 'city' => 'Екатеринбург', 'phones' => ['+79001112233']],
-                ['id' => 2, 'title' => 'Весь город', 'city' => 'Екатеринбург', 'phones' => []],
+                // As in YClients' own example: ids and coordinates arrive as strings.
+                ['id' => '1050', 'title' => 'Ля Визаж', 'city' => 'Москва', 'phone' => '+7 495 509-24-46', 'coordinate_lat' => '55.735662'],
+                ['id' => '1051', 'title' => 'Ля Визаж 2', 'city' => 'Москва', 'phone' => ''],
             ],
             'meta' => [],
         ], JSON_THROW_ON_ERROR)));
         $transport = self::transport($httpClient);
 
-        $companies = (new CompanyApi($transport))->list();
+        $companies = (new CompanyApi($transport))->list(groupId: 83, active: true);
 
         self::assertCount(2, $companies);
-        self::assertSame(1, $companies[0]->id);
-        self::assertSame('Мамина-Сибиряка', $companies[0]->title);
-        self::assertSame(['+79001112233'], $companies[0]->phones);
-        self::assertSame(2, $companies[1]->id);
+        self::assertSame(1050, $companies[0]->id);
+        self::assertSame('+7 495 509-24-46', $companies[0]->phone);
+        self::assertSame(55.735662, $companies[0]->coordinateLat);
+        self::assertNull($companies[1]->phone);
+        parse_str($httpClient->getLastRequest()->getUri()->getQuery(), $query);
+        self::assertSame(['group_id' => '83', 'active' => '1'], $query);
     }
 
     #[Test]

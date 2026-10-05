@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Pagination;
 
+use Dudev\YclientsPhpSdk\Http\RawResponse;
+
 /**
- * One page of a `page`/`count`-paginated list endpoint (`records`, `clients` — the only two
- * confirmed to support it, see `docs/yclients-php-sdk-design.md` in the consuming project).
- * `total` is whatever YClients' `meta.total_count` said on this call; not used to decide when
- * `Api::getAll()` should stop (a short page is enough signal, see its docblock) — kept here only
- * for a caller that wants to render a real "page N of M" UI.
+ * One page of a paginated list endpoint (`records` — `page`/`count`; `clients/search` —
+ * `page`/`page_size`). `total` is YClients' `meta.total_count` when it sent one, otherwise just
+ * the number of items on this page. `Api::getAll()` doesn't use it to decide when to stop (an empty
+ * page is the signal, see its docblock) — it's here for a caller that wants a real "page N of M" UI.
  *
  * @template T
  */
@@ -23,5 +24,17 @@ final readonly class Page
         public int $total,
         public int $page,
     ) {
+    }
+
+    /**
+     * @template TItem
+     * @param list<TItem> $items
+     * @return self<TItem>
+     */
+    public static function fromResponse(array $items, RawResponse $response, int $page): self
+    {
+        $total = $response->meta['total_count'] ?? null;
+
+        return new self($items, is_numeric($total) ? (int) $total : count($items), $page);
     }
 }

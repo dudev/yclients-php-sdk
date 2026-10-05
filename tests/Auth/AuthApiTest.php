@@ -29,6 +29,20 @@ final class AuthApiTest extends TestCase
     }
 
     #[Test]
+    public function itReadsTheUserTokenFromABareBodyWithoutTheEnvelope(): void
+    {
+        // YClients' own spec shows the 201 body as a bare object, with no {success, data, meta}.
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(201, [], json_encode(['id' => 123456, 'user_token' => 'bare-token', 'name' => 'Иван Попов'], JSON_THROW_ON_ERROR)));
+        $transport = self::transport($httpClient);
+
+        $result = (new AuthApi($transport))->authenticate('login', 'password');
+
+        self::assertSame('bare-token', $result->userToken);
+        self::assertSame('bare-token', $transport->userToken());
+    }
+
+    #[Test]
     public function itReturnsATwoFactorResultWithoutTouchingTheTransportsUserToken(): void
     {
         $httpClient = new Client();

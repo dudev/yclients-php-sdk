@@ -49,15 +49,16 @@ final readonly class RecordApi
 
         /** @var list<array<string, mixed>> $items */
         $items = array_values($response->data);
-        $records = array_map(Record::fromArray(...), $items);
 
-        return new Page($records, count($records), $page);
+        return Page::fromResponse(array_map(Record::fromArray(...), $items), $response, $page);
     }
 
     /**
-     * Walks every page of {@see self::list()} for you, largest page size the API accepts (200),
-     * stopping as soon as a page comes back short of that (or empty) — not relying on `meta.total`
-     * being accurate. See `yclients-php-sdk-design.md` §1 for why this exists.
+     * Walks every page of {@see self::list()} for you until a page comes back empty. `count`'s
+     * maximum isn't documented for this endpoint, so a "short page means the last page" rule would
+     * silently truncate if YClients capped it below what we ask for — an empty page is the only
+     * signal that doesn't depend on the cap (costs one extra request). See
+     * `yclients-php-sdk-design.md` §1 for why this exists.
      *
      * @return \Generator<int, Record>
      */
@@ -71,7 +72,7 @@ final readonly class RecordApi
         ?\DateTimeInterface $changedBefore = null,
         bool $withDeleted = false,
     ): \Generator {
-        $pageSize = 200;
+        $pageSize = 100;
         $page = 1;
         while (true) {
             $result = $this->list(
@@ -96,10 +97,6 @@ final readonly class RecordApi
             // with `iterator_to_array()` (which preserves keys by default).
             foreach ($result->items as $item) {
                 yield $item;
-            }
-
-            if (count($result->items) < $pageSize) {
-                return;
             }
 
             ++$page;

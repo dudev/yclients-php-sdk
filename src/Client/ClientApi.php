@@ -9,89 +9,100 @@ use Dudev\YclientsPhpSdk\Transport;
 
 final readonly class ClientApi
 {
+    public const MAX_PAGE_SIZE = 200;
+
     public function __construct(private Transport $transport)
     {
     }
 
     /**
-     * `GET /api/v1/clients/{company_id}` — `partner_token`+`user_token`. No `withDeleted` here —
-     * unlike records, YClients doesn't document an equivalent flag for clients (not confirmed
-     * whether client deletion is signalled at all, see `yclients-clients-design.md` §2/§8).
+     * `POST /api/v1/company/{company_id}/clients/search` — `partner_token`+`user_token`. Replaces
+     * the deprecated `GET /api/v1/clients/{company_id}`. `$pageSize` is capped at 200 by YClients.
      *
+     * The docs don't enumerate the valid `$fields` names (their only example is `["id", "name"]`)
+     * and don't document a "changed since" filter here (the deprecated `GET` had `changed_after`)
+     * — so for a full client card pass the field names you need and check them against the live
+     * API once; omit `$fields` to get whatever YClients returns by default (documented to include
+     * at least `id` and `name`). `$filters` is passed through as-is: a list of
+     * `{"type": "...", "state": {...}}` objects (`id`, `quick_search`, `birthday`, `gender`, ...).
+     *
+     * @param list<string>|null $fields
+     * @param list<array<string, mixed>>|null $filters
+     * @param 'ASC'|'DESC'|null $orderByDirection
+     * @param 'AND'|'OR' $operation how multiple `$filters` combine
      * @return Page<Client>
      */
-    public function list(
+    public function search(
         int $companyId,
         int $page = 1,
-        int $count = 50,
-        ?string $fullname = null,
-        ?string $phone = null,
-        ?string $email = null,
-        ?string $card = null,
-        ?\DateTimeInterface $changedAfter = null,
-        ?\DateTimeInterface $changedBefore = null,
+        int $pageSize = 25,
+        ?array $fields = null,
+        ?array $filters = null,
+        ?string $orderBy = null,
+        ?string $orderByDirection = null,
+        string $operation = 'AND',
     ): Page {
-        $query = array_filter([
+        $body = array_filter([
             'page' => $page,
-            'count' => $count,
-            'fullname' => $fullname,
-            'phone' => $phone,
-            'email' => $email,
-            'card' => $card,
-            'changed_after' => $changedAfter?->format(\DateTimeInterface::ATOM),
-            'changed_before' => $changedBefore?->format(\DateTimeInterface::ATOM),
+            'page_size' => min($pageSize, self::MAX_PAGE_SIZE),
+            'fields' => $fields,
+            'order_by' => $orderBy,
+            'order_by_direction' => $orderByDirection,
+            'operation' => $operation,
+            'filters' => $filters,
         ], static fn (mixed $value): bool => $value !== null);
 
-        $response = $this->transport->requestWithStatus('GET', sprintf('/api/v1/clients/%d', $companyId), query: $query, requireUserToken: true);
+        $response = $this->transport->requestWithStatus(
+            'POST',
+            sprintf('/api/v1/company/%d/clients/search', $companyId),
+            json: $body,
+            requireUserToken: true,
+        );
 
         /** @var list<array<string, mixed>> $items */
         $items = array_values($response->data);
-        $clients = array_map(Client::fromArray(...), $items);
 
-        return new Page($clients, count($clients), $page);
+        return Page::fromResponse(array_map(Client::fromArray(...), $items), $response, $page);
     }
 
     /**
-     * Same "walk every page" helper as `RecordApi::getAll()` — see there for why the loop ends the
-     * way it does.
+     * Walks every page of {@see self::search()} for you, at the largest page size YClients allows,
+     * until a page comes back empty. No "changed since" filter exists here, so this is always a
+     * full walk — which is exactly what a periodic reconcile wants.
      *
+     * @param list<string>|null $fields
+     * @param list<array<string, mixed>>|null $filters
+     * @param 'AND'|'OR' $operation
      * @return \Generator<int, Client>
      */
     public function getAll(
         int $companyId,
-        ?string $fullname = null,
-        ?string $phone = null,
-        ?string $email = null,
-        ?string $card = null,
-        ?\DateTimeInterface $changedAfter = null,
-        ?\DateTimeInterface $changedBefore = null,
+        ?array $fields = null,
+        ?array $filters = null,
+        string $operation = 'AND',
     ): \Generator {
-        $pageSize = 200;
         $page = 1;
         while (true) {
-            $result = $this->list(
+            $result = $this->search(
                 companyId: $companyId,
                 page: $page,
-                count: $pageSize,
-                fullname: $fullname,
-                phone: $phone,
-                email: $email,
-                card: $card,
-                changedAfter: $changedAfter,
-                changedBefore: $changedBefore,
+                pageSize: self::MAX_PAGE_SIZE,
+                fields: $fields,
+                filters: $filters,
+                orderBy: 'id',
+                orderByDirection: 'ASC',
+                operation: $operation,
             );
 
             if ($result->items === []) {
                 return;
             }
 
-            // Not `yield from` — see the identical comment in RecordApi::getAll().
+            // Not `yield from` — every page's items are 0-indexed, so `yield from` would repeat
+            // keys across pages and silently drop clients for any caller collecting the generator
+            // with `iterator_to_array()` (which preserves keys by default).
             foreach ($result->items as $item) {
                 yield $item;
-            }
-
-            if (count($result->items) < $pageSize) {
-                return;
             }
 
             ++$page;

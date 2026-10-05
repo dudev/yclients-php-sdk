@@ -98,6 +98,23 @@ final class RecordTest extends TestCase
         self::assertSame(250000, $record->services[0]->costCents);
     }
 
+    #[Test]
+    public function clientAgreementsIsNullWhenTheSourceHasNone(): void
+    {
+        self::assertNull(Record::fromArray(self::minimal())->clientAgreements);
+        self::assertNull(Record::fromArray(self::minimal(['client_agreements' => null]))->clientAgreements);
+    }
+
+    #[Test]
+    public function aMissingConsentFlagIsUnknownNotRefused(): void
+    {
+        $record = Record::fromArray(self::minimal(['client_agreements' => ['is_personal_data_processing_allowed' => true]]));
+
+        self::assertNotNull($record->clientAgreements);
+        self::assertTrue($record->clientAgreements->isPersonalDataProcessingAllowed);
+        self::assertNull($record->clientAgreements->isNewsletterAllowed);
+    }
+
     /**
      * @param array<string, mixed> $overrides
      * @return array<string, mixed>

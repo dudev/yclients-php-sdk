@@ -148,8 +148,10 @@ final class Transport
 
         /** @var mixed $data */
         $data = $decoded['data'] ?? null;
+        /** @var mixed $meta */
+        $meta = $decoded['meta'] ?? null;
 
-        return new RawResponse($statusCode, is_array($data) ? $data : []);
+        return new RawResponse($statusCode, is_array($data) ? $data : [], is_array($meta) ? $meta : [], $decoded);
     }
 
     private function authorizationHeader(bool $requireUserToken): string

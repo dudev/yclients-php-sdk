@@ -6,7 +6,7 @@ namespace Dudev\YclientsPhpSdk\Staff;
 
 use Dudev\YclientsPhpSdk\RequiredField;
 
-/** `GET /api/v1/staff/{company_id}[/{staff_id}]` — fields confirmed against real webhook payloads and the API docs. */
+/** `GET /api/v1/company/{company_id}/staff/{staff_id}` — fields confirmed against real webhook payloads and the API docs. */
 final readonly class Staff
 {
     public function __construct(
@@ -15,7 +15,8 @@ final readonly class Staff
         public ?string $specialization,
         public ?string $positionTitle,
         public ?string $avatar,
-        public float $rating,
+        /** `null` when the source has none — the non-deprecated REST endpoint doesn't return it, webhooks do. */
+        public ?float $rating,
         public bool $hidden,
         public bool $fired,
     ) {
@@ -34,7 +35,7 @@ final readonly class Staff
             specialization: is_string($data['specialization'] ?? null) ? $data['specialization'] : null,
             positionTitle: $positionTitle,
             avatar: is_string($data['avatar'] ?? null) ? $data['avatar'] : null,
-            rating: is_numeric($data['rating'] ?? null) ? (float) $data['rating'] : 0.0,
+            rating: is_numeric($data['rating'] ?? null) ? (float) $data['rating'] : null,
             hidden: (bool) ($data['hidden'] ?? false),
             fired: (bool) ($data['fired'] ?? false),
         );

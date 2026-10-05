@@ -28,23 +28,46 @@ final class RecordApiTest extends TestCase
     }
 
     #[Test]
-    public function getAllStopsAsSoonAsAPageComesBackShortOfTheFullPageSize(): void
+    public function getAllWalksPagesUntilAnEmptyOneEvenIfYclientsCapsThePageSize(): void
     {
-        $fullPage = array_map(
-            static fn (int $i): array => self::minimalRecordData($i),
-            range(1, 200),
-        );
-        $shortPage = [self::minimalRecordData(201)];
-
+        // A server that caps `count` below what we ask for returns short pages that are not the last one.
         $httpClient = new Client();
-        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => $fullPage, 'meta' => []], JSON_THROW_ON_ERROR)));
-        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => $shortPage, 'meta' => []], JSON_THROW_ON_ERROR)));
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [self::minimalRecordData(1), self::minimalRecordData(2)], 'meta' => []], JSON_THROW_ON_ERROR)));
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [self::minimalRecordData(3)], 'meta' => []], JSON_THROW_ON_ERROR)));
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR)));
         $transport = self::transport($httpClient, userToken: 'user');
 
         $records = iterator_to_array((new RecordApi($transport))->getAll(622905));
 
-        self::assertCount(201, $records);
-        self::assertSame(201, $records[200]->id);
+        self::assertCount(3, $records);
+        self::assertSame(3, $records[2]->id);
+        self::assertCount(3, $httpClient->getRequests());
+    }
+
+    #[Test]
+    public function listReturnsTheRealTotalFromMetaAndTheClientAgreements(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
+            'success' => true,
+            'data' => [self::minimalRecordData(1) + ['client_agreements' => [
+                'client_id' => 245501024,
+                'company_id' => 622905,
+                'is_newsletter_allowed' => false,
+                'is_personal_data_processing_allowed' => true,
+            ]]],
+            'meta' => ['page' => 1, 'total_count' => 10],
+        ], JSON_THROW_ON_ERROR)));
+        $transport = self::transport($httpClient, userToken: 'user');
+
+        $page = (new RecordApi($transport))->list(622905);
+
+        self::assertSame(10, $page->total);
+        $agreements = $page->items[0]->clientAgreements;
+        self::assertNotNull($agreements);
+        self::assertSame(245501024, $agreements->clientId);
+        self::assertFalse($agreements->isNewsletterAllowed);
+        self::assertTrue($agreements->isPersonalDataProcessingAllowed);
     }
 
     #[Test]

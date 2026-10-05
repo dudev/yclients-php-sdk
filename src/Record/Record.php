@@ -29,6 +29,8 @@ final readonly class Record
         public bool $deleted,
         public bool $paidFull,
         public array $services,
+        /** Only present in the list endpoint's response, never in webhooks or the single-record `GET`. */
+        public ?ClientAgreements $clientAgreements = null,
     ) {
     }
 
@@ -51,6 +53,14 @@ final readonly class Record
         /** @var mixed $rawAttendance */
         $rawAttendance = RequiredField::key($data, 'attendance', self::class);
 
+        /** @var mixed $rawAgreements */
+        $rawAgreements = $data['client_agreements'] ?? null;
+        $clientAgreements = null;
+        if (is_array($rawAgreements)) {
+            /** @var array<string, mixed> $rawAgreements */
+            $clientAgreements = ClientAgreements::fromArray($rawAgreements);
+        }
+
         return new self(
             id: RequiredField::int($data, 'id', self::class),
             companyId: RequiredField::int($data, 'company_id', self::class),
@@ -71,6 +81,7 @@ final readonly class Record
             deleted: (bool) ($data['deleted'] ?? false),
             paidFull: (bool) ($data['paid_full'] ?? false),
             services: $services,
+            clientAgreements: $clientAgreements,
         );
     }
 

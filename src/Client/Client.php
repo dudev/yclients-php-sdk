@@ -82,8 +82,13 @@ final readonly class Client
         );
     }
 
+    /** Accepts ints too: YClients' own REST example shows `"phone": 79112345679` as a number. */
     private static function nonEmptyString(mixed $value): ?string
     {
+        if (is_int($value)) {
+            return (string) $value;
+        }
+
         return is_string($value) && $value !== '' ? $value : null;
     }
 

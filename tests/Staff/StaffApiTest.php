@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Tests\Staff;
 
+use Dudev\YclientsPhpSdk\Exception\YclientsException;
 use Dudev\YclientsPhpSdk\Staff\StaffApi;
 use Dudev\YclientsPhpSdk\Transport;
 use Http\Mock\Client;
@@ -15,39 +16,76 @@ use PHPUnit\Framework\TestCase;
 final class StaffApiTest extends TestCase
 {
     #[Test]
-    public function listParsesPositionAndRating(): void
+    public function getUsesTheNewEndpointAndTakesTheFirstElementOfDataArray(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
+            'success' => true,
+            'data' => [[
+                'id' => 1001539,
+                'name' => 'Сотрудник 1',
+                'company_id' => 176275,
+                'specialization' => 'специалист',
+                'position' => ['id' => 1, 'title' => 'Администратор'],
+                'fired' => 0,
+                'hidden' => 0,
+            ]],
+            'meta' => ['total_count' => 1],
+        ], JSON_THROW_ON_ERROR)));
+        $transport = self::transport($httpClient);
+
+        $staff = (new StaffApi($transport))->get(176275, 1001539);
+
+        self::assertStringEndsWith('/api/v1/company/176275/staff/1001539', (string) $httpClient->getLastRequest()->getUri());
+        self::assertSame('Bearer partner, User user', $httpClient->getLastRequest()->getHeaderLine('Authorization'));
+        self::assertSame(1001539, $staff->id);
+        self::assertSame('Администратор', $staff->positionTitle);
+        self::assertNull($staff->rating, 'the non-deprecated endpoint returns no rating');
+        self::assertFalse($staff->hidden);
+    }
+
+    #[Test]
+    public function getThrowsWhenNothingComesBack(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR)));
+
+        $this->expectException(YclientsException::class);
+
+        (new StaffApi(self::transport($httpClient)))->get(176275, 1);
+    }
+
+    #[Test]
+    public function listParsesEveryEmployee(): void
     {
         $httpClient = new Client();
         $httpClient->addResponse(new Response(200, [], json_encode([
             'success' => true,
             'data' => [
-                [
-                    'id' => 5963751,
-                    'name' => 'Анна Кирменская',
-                    'specialization' => 'Мастер',
-                    'position' => ['id' => 1, 'title' => 'Массажист'],
-                    'rating' => 4.92,
-                    'hidden' => 0,
-                    'fired' => 0,
-                ],
+                ['id' => 1, 'name' => 'Анна'],
+                ['id' => 2, 'name' => 'Ольга', 'rating' => 4.98],
             ],
-            'meta' => [],
+            'meta' => ['total_count' => 2],
         ], JSON_THROW_ON_ERROR)));
+
+        $staff = (new StaffApi(self::transport($httpClient)))->list(176275);
+
+        self::assertCount(2, $staff);
+        self::assertSame(4.98, $staff[1]->rating);
+        self::assertStringEndsWith('/api/v1/company/176275/staff/0', (string) $httpClient->getLastRequest()->getUri());
+    }
+
+    private static function transport(Client $httpClient): Transport
+    {
         $psr17 = new Psr17Factory();
-        $transport = new Transport(
+
+        return new Transport(
             partnerToken: 'partner',
             httpClient: $httpClient,
+            userToken: 'user',
             requestFactory: $psr17,
             streamFactory: $psr17,
             throttle: null,
         );
-
-        $staff = (new StaffApi($transport))->list(622905);
-
-        self::assertCount(1, $staff);
-        self::assertSame(5963751, $staff[0]->id);
-        self::assertSame('Массажист', $staff[0]->positionTitle);
-        self::assertSame(4.92, $staff[0]->rating);
-        self::assertFalse($staff[0]->hidden);
     }
 }

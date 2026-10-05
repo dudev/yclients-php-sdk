@@ -26,4 +26,13 @@ final class ClientTest extends TestCase
 
         Client::fromArray(['id' => 1]);
     }
+
+    #[Test]
+    public function itAcceptsAPhoneSentAsANumber(): void
+    {
+        // YClients' own REST example shows `"phone": 79112345679` (an int), webhooks send a string.
+        $client = Client::fromArray(['id' => 16, 'name' => 'Василий', 'phone' => 79112345679]);
+
+        self::assertSame('79112345679', $client->phone);
+    }
 }
