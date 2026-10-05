@@ -10,9 +10,10 @@ use Dudev\YclientsPhpSdk\Record\Record;
 use Dudev\YclientsPhpSdk\Staff\Staff;
 
 /**
- * A single YClients webhook. The envelope — `{company_id, resource, resource_id, status, data}` —
- * isn't in YClients' own API docs at all (they don't document webhooks); it's confirmed against
- * real production payloads instead (see the consuming project's `yclients-php-sdk-design.md` §6).
+ * A single YClients data-event webhook. The envelope — `{company_id, resource, resource_id, status,
+ * data}` — isn't in YClients' own API docs (only the Marketplace lifecycle webhooks `uninstall`/
+ * `freeze`, with a different envelope, are documented); it's confirmed against real production
+ * payloads instead (see the consuming project's `yclients-php-sdk-design.md` §6).
  *
  * `data` turned out to use the exact same shape as the matching REST resource's detail response
  * (confirmed for `record`/`client`/`staff` against real payloads), so it's parsed with that
