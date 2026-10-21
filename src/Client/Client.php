@@ -43,6 +43,8 @@ final readonly class Client
         public int $visits,
         public array $categories,
         public array $customFields,
+        /** Only the single-client `GET` returns it (see {@see ClientAgreements}); `null` everywhere else. */
+        public ?ClientAgreements $clientAgreements = null,
     ) {
     }
 
@@ -59,6 +61,14 @@ final readonly class Client
         /** @var mixed $rawCustomFields */
         $rawCustomFields = $data['custom_fields'] ?? [];
         $customFields = is_array($rawCustomFields) ? $rawCustomFields : [];
+
+        /** @var mixed $rawAgreements */
+        $rawAgreements = $data['client_agreements'] ?? null;
+        $clientAgreements = null;
+        if (is_array($rawAgreements)) {
+            /** @var array<string, mixed> $rawAgreements */
+            $clientAgreements = ClientAgreements::fromArray($rawAgreements);
+        }
 
         return new self(
             id: RequiredField::int($data, 'id', self::class),
@@ -79,6 +89,7 @@ final readonly class Client
             visits: is_numeric($data['visits'] ?? null) ? (int) $data['visits'] : 0,
             categories: $categories,
             customFields: $customFields,
+            clientAgreements: $clientAgreements,
         );
     }
 

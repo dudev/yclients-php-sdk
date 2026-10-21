@@ -45,6 +45,23 @@ final class StaffApiTest extends TestCase
     }
 
     #[Test]
+    public function getAlsoAcceptsASingleObjectAsTheLiveApiSendsIt(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
+            'success' => true,
+            'data' => ['id' => 5702076, 'name' => 'Елизавета', 'rating' => 5, 'position' => ['id' => 41734, 'title' => 'Мастер']],
+            'meta' => [],
+        ], JSON_THROW_ON_ERROR)));
+
+        $staff = (new StaffApi(self::transport($httpClient)))->get(622905, 5702076);
+
+        self::assertSame(5702076, $staff->id);
+        self::assertSame(5.0, $staff->rating);
+        self::assertSame('Мастер', $staff->positionTitle);
+    }
+
+    #[Test]
     public function getThrowsWhenNothingComesBack(): void
     {
         $httpClient = new Client();
@@ -72,7 +89,7 @@ final class StaffApiTest extends TestCase
 
         self::assertCount(2, $staff);
         self::assertSame(4.98, $staff[1]->rating);
-        self::assertStringEndsWith('/api/v1/company/176275/staff/0', (string) $httpClient->getLastRequest()->getUri());
+        self::assertStringEndsWith('/api/v1/company/176275/staff', (string) $httpClient->getLastRequest()->getUri());
     }
 
     private static function transport(Client $httpClient): Transport

@@ -19,18 +19,20 @@ final readonly class ClientApi
      * `POST /api/v1/company/{company_id}/clients/search` — `partner_token`+`user_token`. Replaces
      * the deprecated `GET /api/v1/clients/{company_id}`. `$pageSize` is capped at 200 by YClients.
      *
-     * The docs don't enumerate the valid `$fields` names (their only example is `["id", "name"]`)
-     * and don't document a "changed since" filter here (the deprecated `GET` had `changed_after`)
-     * — so for a full client card pass the field names you need and check them against the live
-     * API once; omit `$fields` to get whatever YClients returns by default (documented to include
-     * at least `id` and `name`). `$filters` is passed through as-is: a list of
-     * `{"type": "...", "state": {...}}` objects (`id`, `quick_search`, `birthday`, `gender`, ...).
+     * **This is a listing, not a full client card.** Verified on the live API (2026-10-21): without
+     * `$fields` only `id` comes back; unknown names are silently ignored; the only names that
+     * returned data were `id`, `name`, `surname`, `patronymic`, `phone`, `email`, `discount`,
+     * `first_visit_date`, `last_visit_date`, `sold_amount`, `visits_count`. Card, birth date, comment,
+     * sex, importance, categories, custom fields, `last_change_date` and consents are NOT available
+     * here — use {@see self::get()} for those. There is no "changed since" filter either (the
+     * deprecated `GET /api/v1/clients/{company_id}` has `changed_after`). `$filters` is passed
+     * through as-is: a list of `{"type": "...", "state": {...}}` objects (`id`, `quick_search`, ...).
      *
      * @param list<string>|null $fields
      * @param list<array<string, mixed>>|null $filters
      * @param 'ASC'|'DESC'|null $orderByDirection
      * @param 'AND'|'OR' $operation how multiple `$filters` combine
-     * @return Page<Client>
+     * @return Page<ClientSummary>
      */
     public function search(
         int $companyId,
@@ -62,7 +64,7 @@ final readonly class ClientApi
         /** @var list<array<string, mixed>> $items */
         $items = array_values($response->data);
 
-        return Page::fromResponse(array_map(Client::fromArray(...), $items), $response, $page);
+        return Page::fromResponse(array_map(ClientSummary::fromArray(...), $items), $response, $page);
     }
 
     /**
@@ -73,7 +75,7 @@ final readonly class ClientApi
      * @param list<string>|null $fields
      * @param list<array<string, mixed>>|null $filters
      * @param 'AND'|'OR' $operation
-     * @return \Generator<int, Client>
+     * @return \Generator<int, ClientSummary>
      */
     public function getAll(
         int $companyId,
@@ -109,7 +111,10 @@ final readonly class ClientApi
         }
     }
 
-    /** `GET /api/v1/client/{company_id}/{id}` — `partner_token`+`user_token`. */
+    /**
+     * `GET /api/v1/client/{company_id}/{id}` — `partner_token`+`user_token`. The only endpoint that
+     * returns a full card *and* `client_agreements` (consents).
+     */
     public function get(int $companyId, int $id): Client
     {
         $data = $this->transport->request('GET', sprintf('/api/v1/client/%d/%d', $companyId, $id), requireUserToken: true);

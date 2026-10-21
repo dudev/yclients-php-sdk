@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Dudev\YclientsPhpSdk\Record;
 
+use Dudev\YclientsPhpSdk\Client\ClientAgreements;
 use Dudev\YclientsPhpSdk\Exception\YclientsMalformedPayloadException;
 use Dudev\YclientsPhpSdk\RequiredField;
 
@@ -29,7 +30,7 @@ final readonly class Record
         public bool $deleted,
         public bool $paidFull,
         public array $services,
-        /** Only present in the list endpoint's response, never in webhooks or the single-record `GET`. */
+        /** Only the single-record `GET` carries it — not the records list (despite the docs), not webhooks. */
         public ?ClientAgreements $clientAgreements = null,
     ) {
     }

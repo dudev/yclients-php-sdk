@@ -22,8 +22,8 @@ final class ClientApiTest extends TestCase
         $httpClient->addResponse(new Response(200, [], json_encode([
             'success' => true,
             'data' => [
-                ['id' => 1, 'name' => 'Иван', 'phone' => '+79001112233', 'categories' => [['id' => 5, 'title' => 'VIP']]],
-                ['id' => 2, 'name' => 'Мария', 'labels' => [['id' => 6, 'title' => 'Постоянный']]],
+                ['id' => 1, 'name' => 'Иван', 'phone' => '+79001112233', 'sold_amount' => 1500.5, 'visits_count' => 3, 'first_visit_date' => '2024-05-01 10:00:00', 'last_visit_date' => ''],
+                ['id' => 2, 'name' => 'Мария'],
             ],
             'meta' => ['total_count' => 908],
         ], JSON_THROW_ON_ERROR)));
@@ -47,8 +47,67 @@ final class ClientApiTest extends TestCase
         self::assertCount(2, $page->items);
         self::assertSame(908, $page->total);
         self::assertSame('Иван', $page->items[0]->name);
-        self::assertSame([['id' => 5, 'title' => 'VIP']], $page->items[0]->categories);
-        self::assertSame([['id' => 6, 'title' => 'Постоянный']], $page->items[1]->categories);
+        self::assertSame(1500.5, $page->items[0]->soldAmount);
+        self::assertSame(3, $page->items[0]->visitsCount);
+        self::assertSame('2024-05-01 10:00:00', $page->items[0]->firstVisitDate?->format('Y-m-d H:i:s'));
+        self::assertNull($page->items[0]->lastVisitDate, 'an empty string means "never visited"');
+        self::assertNull($page->items[1]->phone, 'fields that were not requested stay null, not a fake default');
+        self::assertNull($page->items[1]->visitsCount);
+    }
+
+    #[Test]
+    public function searchWithoutFieldsReturnsOnlyIds(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [['id' => 7]], 'meta' => ['total_count' => 1]], JSON_THROW_ON_ERROR)));
+
+        $page = (new ClientApi(self::transport($httpClient, userToken: 'user')))->search(622905);
+
+        self::assertSame(7, $page->items[0]->id);
+        self::assertNull($page->items[0]->name);
+    }
+
+    #[Test]
+    public function getParsesTheFullCardIncludingTheConsents(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
+            'success' => true,
+            'data' => [
+                'id' => 438311700,
+                'name' => 'Милана',
+                'categories' => [['id' => 6327742, 'title' => 'Телеграм']],
+                'client_agreements' => [
+                    'id' => 71636691,
+                    'client_id' => 438311700,
+                    'company_id' => 622905,
+                    'is_newsletter_allowed' => true,
+                    'is_personal_data_processing_allowed' => false,
+                    'is_yc_newsletter_allowed' => true,
+                ],
+            ],
+            'meta' => [],
+        ], JSON_THROW_ON_ERROR)));
+
+        $client = (new ClientApi(self::transport($httpClient, userToken: 'user')))->get(622905, 438311700);
+
+        self::assertSame([['id' => 6327742, 'title' => 'Телеграм']], $client->categories);
+        self::assertNotNull($client->clientAgreements);
+        self::assertTrue($client->clientAgreements->isNewsletterAllowed);
+        self::assertFalse($client->clientAgreements->isPersonalDataProcessingAllowed);
+        self::assertTrue($client->clientAgreements->isYcNewsletterAllowed);
+        self::assertNull($client->clientAgreements->isYcPersonalDataProcessingAllowed, 'a flag YClients did not send is unknown, not refused');
+    }
+
+    #[Test]
+    public function getLeavesTheConsentsNullWhenTheClientHasNone(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => ['id' => 1, 'name' => 'Иван', 'client_agreements' => null], 'meta' => []], JSON_THROW_ON_ERROR)));
+
+        $client = (new ClientApi(self::transport($httpClient, userToken: 'user')))->get(622905, 1);
+
+        self::assertNull($client->clientAgreements);
     }
 
     #[Test]

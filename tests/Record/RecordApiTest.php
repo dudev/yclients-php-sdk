@@ -45,29 +45,42 @@ final class RecordApiTest extends TestCase
     }
 
     #[Test]
-    public function listReturnsTheRealTotalFromMetaAndTheClientAgreements(): void
+    public function listReturnsTheRealTotalFromMeta(): void
     {
         $httpClient = new Client();
         $httpClient->addResponse(new Response(200, [], json_encode([
             'success' => true,
-            'data' => [self::minimalRecordData(1) + ['client_agreements' => [
+            'data' => [self::minimalRecordData(1)],
+            'meta' => ['page' => 1, 'total_count' => 43520],
+        ], JSON_THROW_ON_ERROR)));
+
+        $page = (new RecordApi(self::transport($httpClient, userToken: 'user')))->list(622905);
+
+        self::assertSame(43520, $page->total);
+        self::assertNull($page->items[0]->clientAgreements, 'the live records list never carries client_agreements');
+    }
+
+    #[Test]
+    public function getParsesTheClientAgreementsOnlyTheSingleRecordReturns(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
+            'success' => true,
+            'data' => self::minimalRecordData(1) + ['client_agreements' => [
                 'client_id' => 245501024,
                 'company_id' => 622905,
                 'is_newsletter_allowed' => false,
                 'is_personal_data_processing_allowed' => true,
-            ]]],
-            'meta' => ['page' => 1, 'total_count' => 10],
+            ]],
+            'meta' => [],
         ], JSON_THROW_ON_ERROR)));
-        $transport = self::transport($httpClient, userToken: 'user');
 
-        $page = (new RecordApi($transport))->list(622905);
+        $record = (new RecordApi(self::transport($httpClient, userToken: 'user')))->get(622905, 1);
 
-        self::assertSame(10, $page->total);
-        $agreements = $page->items[0]->clientAgreements;
-        self::assertNotNull($agreements);
-        self::assertSame(245501024, $agreements->clientId);
-        self::assertFalse($agreements->isNewsletterAllowed);
-        self::assertTrue($agreements->isPersonalDataProcessingAllowed);
+        self::assertNotNull($record->clientAgreements);
+        self::assertSame(245501024, $record->clientAgreements->clientId);
+        self::assertFalse($record->clientAgreements->isNewsletterAllowed);
+        self::assertTrue($record->clientAgreements->isPersonalDataProcessingAllowed);
     }
 
     #[Test]

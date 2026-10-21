@@ -23,14 +23,16 @@ final readonly class CompanyApi
      * `GET /api/v1/companies` — only `partner_token` needed. The docs list `page`/`count` for it
      * but this method doesn't send them (a partner's handful of companies fits one response —
      * add them if that stops being true). `$id` is a single company id: the docs declare it a
-     * number, not a list.
+     * number, not a list. `$my = true` limits it to the companies the token's user manages — without
+     * it the live API returned 25 unrelated companies (verified 2026-10-21), with it exactly our two.
      *
      * @return list<Company>
      */
-    public function list(?int $id = null, ?int $groupId = null, ?bool $active = null): array
+    public function list(?int $id = null, ?int $groupId = null, ?bool $active = null, ?bool $my = null): array
     {
         $query = array_filter([
             'id' => $id,
+            'my' => $my !== null ? (int) $my : null,
             'group_id' => $groupId,
             'active' => $active !== null ? (int) $active : null,
         ], static fn (mixed $value): bool => $value !== null);
