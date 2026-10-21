@@ -84,15 +84,16 @@ final class RecordApiTest extends TestCase
     }
 
     #[Test]
-    public function getAllStopsImmediatelyOnAnEmptyFirstPage(): void
+    public function getAllReturnsNothingForAGenuinelyEmptyListAfterDoubtingTheFirstPage(): void
     {
         $httpClient = new Client();
-        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR)));
+        $httpClient->setDefaultResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => []], JSON_THROW_ON_ERROR)));
         $transport = self::transport($httpClient, userToken: 'user');
 
         $records = iterator_to_array((new RecordApi($transport))->getAll(622905));
 
         self::assertSame([], $records);
+        self::assertCount(3, $httpClient->getRequests(), 'an empty first page is retried twice before it is believed');
     }
 
     #[Test]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dudev\YclientsPhpSdk\Client;
 
 use Dudev\YclientsPhpSdk\Pagination\Page;
+use Dudev\YclientsPhpSdk\Pagination\PageWalker;
 use Dudev\YclientsPhpSdk\Transport;
 
 final readonly class ClientApi
@@ -68,9 +69,10 @@ final readonly class ClientApi
     }
 
     /**
-     * Walks every page of {@see self::search()} for you, at the largest page size YClients allows,
-     * until a page comes back empty. No "changed since" filter exists here, so this is always a
-     * full walk — which is exactly what a periodic reconcile wants.
+     * Walks every page of {@see self::search()} for you, at the largest page size YClients allows
+     * (see {@see PageWalker} for how the end, and a glitchy empty page, are told apart). No "changed
+     * since" filter exists here — verified: neither `last_change_date` nor any similar name works as a
+     * filter or sort key — so this is always a full walk, which is what a periodic reconcile wants.
      *
      * @param list<string>|null $fields
      * @param list<array<string, mixed>>|null $filters
@@ -83,32 +85,16 @@ final readonly class ClientApi
         ?array $filters = null,
         string $operation = 'AND',
     ): \Generator {
-        $page = 1;
-        while (true) {
-            $result = $this->search(
-                companyId: $companyId,
-                page: $page,
-                pageSize: self::MAX_PAGE_SIZE,
-                fields: $fields,
-                filters: $filters,
-                orderBy: 'id',
-                orderByDirection: 'ASC',
-                operation: $operation,
-            );
-
-            if ($result->items === []) {
-                return;
-            }
-
-            // Not `yield from` — every page's items are 0-indexed, so `yield from` would repeat
-            // keys across pages and silently drop clients for any caller collecting the generator
-            // with `iterator_to_array()` (which preserves keys by default).
-            foreach ($result->items as $item) {
-                yield $item;
-            }
-
-            ++$page;
-        }
+        return PageWalker::walk(fn (int $page): Page => $this->search(
+            companyId: $companyId,
+            page: $page,
+            pageSize: self::MAX_PAGE_SIZE,
+            fields: $fields,
+            filters: $filters,
+            orderBy: 'id',
+            orderByDirection: 'ASC',
+            operation: $operation,
+        ));
     }
 
     /**

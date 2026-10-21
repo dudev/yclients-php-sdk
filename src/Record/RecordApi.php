@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Dudev\YclientsPhpSdk\Record;
 
 use Dudev\YclientsPhpSdk\Pagination\Page;
+use Dudev\YclientsPhpSdk\Pagination\PageWalker;
 use Dudev\YclientsPhpSdk\Transport;
 
 final readonly class RecordApi
@@ -54,11 +55,9 @@ final readonly class RecordApi
     }
 
     /**
-     * Walks every page of {@see self::list()} for you until a page comes back empty. `count`'s
-     * maximum isn't documented for this endpoint, so a "short page means the last page" rule would
-     * silently truncate if YClients capped it below what we ask for — an empty page is the only
-     * signal that doesn't depend on the cap (costs one extra request). See
-     * `yclients-php-sdk-design.md` §1 for why this exists.
+     * Walks every page of {@see self::list()} for you, 100 at a time (`count` accepted 1000 on the
+     * live API, but the docs name no maximum). A short page is not taken as the last one — see
+     * {@see PageWalker} for how the end, and a glitchy empty page, are told apart.
      *
      * @return \Generator<int, Record>
      */
@@ -72,35 +71,18 @@ final readonly class RecordApi
         ?\DateTimeInterface $changedBefore = null,
         bool $withDeleted = false,
     ): \Generator {
-        $pageSize = 100;
-        $page = 1;
-        while (true) {
-            $result = $this->list(
-                companyId: $companyId,
-                page: $page,
-                count: $pageSize,
-                staffId: $staffId,
-                clientId: $clientId,
-                startDate: $startDate,
-                endDate: $endDate,
-                changedAfter: $changedAfter,
-                changedBefore: $changedBefore,
-                withDeleted: $withDeleted,
-            );
-
-            if ($result->items === []) {
-                return;
-            }
-
-            // Not `yield from` — every page's items are 0-indexed, so `yield from` would repeat
-            // keys across pages and silently drop records for any caller collecting the generator
-            // with `iterator_to_array()` (which preserves keys by default).
-            foreach ($result->items as $item) {
-                yield $item;
-            }
-
-            ++$page;
-        }
+        return PageWalker::walk(fn (int $page): Page => $this->list(
+            companyId: $companyId,
+            page: $page,
+            count: 100,
+            staffId: $staffId,
+            clientId: $clientId,
+            startDate: $startDate,
+            endDate: $endDate,
+            changedAfter: $changedAfter,
+            changedBefore: $changedBefore,
+            withDeleted: $withDeleted,
+        ));
     }
 
     /** `GET /api/v1/record/{company_id}/{record_id}` — `partner_token`+`user_token`. */
