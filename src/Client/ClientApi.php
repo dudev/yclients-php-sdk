@@ -98,6 +98,46 @@ final readonly class ClientApi
     }
 
     /**
+     * Ids (and change times) of clients changed or created after `$changedAfter` — the one thing
+     * `clients/search` cannot do. Deliberately built on the **deprecated** `GET /api/v1/clients/
+     * {company_id}`, the only endpoint with a change filter, and used for nothing else: only `id`
+     * and `last_change_date` are read, the card is re-read with {@see self::get()}.
+     *
+     * Verified on the live API (2026-10-21): `changed_after` is **strictly greater** (a client whose
+     * `last_change_date` equals it is not returned), it is a naive date-time read in the time zone of
+     * `last_change_date` (`+04:00` in every sample), and a value with an offset is not understood —
+     * the filter is then silently dropped and everything comes back. So the given instant is
+     * converted to `+04:00` and sent without an offset; poll with an overlap (re-ask from a few
+     * minutes before the last poll) and de-duplicate by id.
+     *
+     * @return \Generator<int, ChangedClient>
+     */
+    public function changedSince(int $companyId, \DateTimeInterface $changedAfter, ?\DateTimeInterface $changedBefore = null): \Generator
+    {
+        $zone = new \DateTimeZone('+04:00');
+        $format = static fn (\DateTimeInterface $at): string => \DateTimeImmutable::createFromInterface($at)->setTimezone($zone)->format('Y-m-d\TH:i:s');
+
+        return PageWalker::walk(function (int $page) use ($companyId, $changedAfter, $changedBefore, $format): Page {
+            $response = $this->transport->requestWithStatus(
+                'GET',
+                sprintf('/api/v1/clients/%d', $companyId),
+                query: array_filter([
+                    'page' => $page,
+                    'count' => self::MAX_PAGE_SIZE,
+                    'changed_after' => $format($changedAfter),
+                    'changed_before' => $changedBefore !== null ? $format($changedBefore) : null,
+                ], static fn (mixed $value): bool => $value !== null),
+                requireUserToken: true,
+            );
+
+            /** @var list<array<string, mixed>> $items */
+            $items = array_values($response->data);
+
+            return Page::fromResponse(array_map(ChangedClient::fromArray(...), $items), $response, $page);
+        });
+    }
+
+    /**
      * `GET /api/v1/client/{company_id}/{id}` — `partner_token`+`user_token`. The only endpoint that
      * returns a full card *and* `client_agreements` (consents).
      */

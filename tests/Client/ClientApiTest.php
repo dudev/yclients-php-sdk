@@ -141,6 +141,36 @@ final class ClientApiTest extends TestCase
     }
 
     #[Test]
+    public function changedSinceAsksTheDeprecatedListWithANaiveDateTimeInTheApisZone(): void
+    {
+        $httpClient = new Client();
+        $httpClient->addResponse(new Response(200, [], json_encode([
+            'success' => true,
+            'data' => [
+                ['id' => 438311700, 'name' => 'Милана', 'last_change_date' => '2026-10-22T20:01:19+0400', 'spent' => 3680],
+                ['id' => 245501024, 'name' => 'Алла', 'last_change_date' => ''],
+            ],
+            'meta' => ['page' => 1, 'total_count' => 2],
+        ], JSON_THROW_ON_ERROR)));
+        $httpClient->addResponse(new Response(200, [], json_encode(['success' => true, 'data' => [], 'meta' => ['page' => 2, 'total_count' => 2]], JSON_THROW_ON_ERROR)));
+        $transport = self::transport($httpClient, userToken: 'user');
+
+        $changed = iterator_to_array((new ClientApi($transport))->changedSince(622905, new \DateTimeImmutable('2026-10-22 15:00:00 UTC')));
+
+        self::assertCount(2, $changed);
+        self::assertSame(438311700, $changed[0]->id);
+        self::assertSame('2026-10-22T20:01:19+04:00', $changed[0]->lastChangeDate?->format('c'));
+        self::assertNull($changed[1]->lastChangeDate);
+        $first = $httpClient->getRequests()[0];
+        self::assertSame('GET', $first->getMethod());
+        self::assertStringContainsString('/api/v1/clients/622905', (string) $first->getUri());
+        parse_str($first->getUri()->getQuery(), $query);
+        self::assertSame('2026-10-22T19:00:00', $query['changed_after'], '15:00 UTC is 19:00 in +04:00, sent with no offset');
+        self::assertSame('200', $query['count']);
+        self::assertArrayNotHasKey('changed_before', $query);
+    }
+
+    #[Test]
     public function createSendsBothCategoriesAndLabelsForTheSameIds(): void
     {
         $httpClient = new Client();
