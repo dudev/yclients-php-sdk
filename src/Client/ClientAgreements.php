@@ -13,9 +13,9 @@ namespace Dudev\YclientsPhpSdk\Client;
  * anything; not returned by `clients/search`, the deprecated clients list, the records list or
  * webhooks.
  *
- * All flags are nullable on purpose: one YClients didn't send is "unknown", which for consent is
- * not the same thing as "refused". The `yc` pair is consent to YClients itself (the platform), not
- * to the salon.
+ * All flags are nullable: the SDK reports faithfully that YClients did not send one, and leaves
+ * what that means to the consumer (relsy treats anything but `true` as "no"). The `yc` pair is
+ * consent to YClients itself (the platform), not to the salon.
  */
 final readonly class ClientAgreements
 {
