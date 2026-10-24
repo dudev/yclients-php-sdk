@@ -35,4 +35,22 @@ final class ClientTest extends TestCase
 
         self::assertSame('79112345679', $client->phone);
     }
+
+    #[Test]
+    public function itParsesLastChangeDateInBothOffsetForms(): void
+    {
+        $compact = Client::fromArray(['id' => 1, 'name' => 'Милана', 'last_change_date' => '2026-10-22T20:01:19+0400']);
+        $colon = Client::fromArray(['id' => 1, 'name' => 'Милана', 'last_change_date' => '2026-10-22T20:01:19+04:00']);
+
+        self::assertSame('2026-10-22T20:01:19+04:00', $compact->lastChangeDate?->format('c'));
+        self::assertEquals($compact->lastChangeDate, $colon->lastChangeDate);
+    }
+
+    #[Test]
+    public function lastChangeDateIsNullWhenMissingEmptyOrUnparseable(): void
+    {
+        self::assertNull(Client::fromArray(['id' => 1, 'name' => 'Милана'])->lastChangeDate);
+        self::assertNull(Client::fromArray(['id' => 1, 'name' => 'Милана', 'last_change_date' => ''])->lastChangeDate);
+        self::assertNull(Client::fromArray(['id' => 1, 'name' => 'Милана', 'last_change_date' => 'вчера'])->lastChangeDate);
+    }
 }

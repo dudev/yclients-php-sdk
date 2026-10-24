@@ -45,6 +45,8 @@ final readonly class Client
         public array $customFields,
         /** Only the single-client `GET` returns it (see {@see ClientAgreements}); `null` everywhere else. */
         public ?ClientAgreements $clientAgreements = null,
+        /** When YClients last changed the card; `null` if it sent none. Offset is whatever YClients used (`+04:00` in every sample). */
+        public ?\DateTimeImmutable $lastChangeDate = null,
     ) {
     }
 
@@ -90,6 +92,7 @@ final readonly class Client
             categories: $categories,
             customFields: $customFields,
             clientAgreements: $clientAgreements,
+            lastChangeDate: self::parseDateTime($data['last_change_date'] ?? null),
         );
     }
 
@@ -101,6 +104,19 @@ final readonly class Client
         }
 
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** `"2026-10-22T20:01:19+0400"` in samples; the colon form is accepted too. */
+    private static function parseDateTime(mixed $value): ?\DateTimeImmutable
+    {
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $value)
+            ?: \DateTimeImmutable::createFromFormat('Y-m-d\TH:i:sO', $value);
+
+        return $date !== false ? $date : null;
     }
 
     private static function parseDate(mixed $value): ?\DateTimeImmutable
