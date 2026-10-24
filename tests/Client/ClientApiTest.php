@@ -93,9 +93,9 @@ final class ClientApiTest extends TestCase
 
         self::assertSame([['id' => 6327742, 'title' => 'Телеграм']], $client->categories);
         self::assertNotNull($client->clientAgreements);
-        self::assertTrue($client->clientAgreements->isNewsletterAllowed);
+        self::assertTrue($client->clientAgreements->isMarketingCommunicationsAllowed);
         self::assertFalse($client->clientAgreements->isPersonalDataProcessingAllowed);
-        self::assertTrue($client->clientAgreements->isYcNewsletterAllowed);
+        self::assertTrue($client->clientAgreements->isYcMarketingCommunicationsAllowed);
         self::assertNull($client->clientAgreements->isYcPersonalDataProcessingAllowed, 'a flag YClients did not send is unknown, not refused');
     }
 

@@ -112,7 +112,7 @@ final class RecordTest extends TestCase
 
         self::assertNotNull($record->clientAgreements);
         self::assertTrue($record->clientAgreements->isPersonalDataProcessingAllowed);
-        self::assertNull($record->clientAgreements->isNewsletterAllowed);
+        self::assertNull($record->clientAgreements->isMarketingCommunicationsAllowed);
     }
 
     /**

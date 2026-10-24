@@ -13,7 +13,9 @@ namespace Dudev\YclientsPhpSdk\Client;
  * anything; not returned by `clients/search`, the deprecated clients list, the records list or
  * webhooks.
  *
- * All flags are nullable: the SDK reports faithfully that YClients did not send one, and leaves
+ * `isMarketingCommunicationsAllowed` is the wire field `is_newsletter_allowed` — YClients' own label for
+ * it is "информационно-рекламная рассылка" (advertising/marketing communications, not a news feed), hence
+ * the name. All flags are nullable: the SDK reports faithfully that YClients did not send one, and leaves
  * what that means to the consumer (relsy treats anything but `true` as "no"). The `yc` pair is
  * consent to YClients itself (the platform), not to the salon.
  */
@@ -22,9 +24,9 @@ final readonly class ClientAgreements
     public function __construct(
         public ?int $clientId,
         public ?int $companyId,
-        public ?bool $isNewsletterAllowed,
+        public ?bool $isMarketingCommunicationsAllowed,
         public ?bool $isPersonalDataProcessingAllowed,
-        public ?bool $isYcNewsletterAllowed,
+        public ?bool $isYcMarketingCommunicationsAllowed,
         public ?bool $isYcPersonalDataProcessingAllowed,
     ) {
     }
@@ -35,9 +37,9 @@ final readonly class ClientAgreements
         return new self(
             clientId: is_numeric($data['client_id'] ?? null) ? (int) $data['client_id'] : null,
             companyId: is_numeric($data['company_id'] ?? null) ? (int) $data['company_id'] : null,
-            isNewsletterAllowed: self::flag($data['is_newsletter_allowed'] ?? null),
+            isMarketingCommunicationsAllowed: self::flag($data['is_newsletter_allowed'] ?? null),
             isPersonalDataProcessingAllowed: self::flag($data['is_personal_data_processing_allowed'] ?? null),
-            isYcNewsletterAllowed: self::flag($data['is_yc_newsletter_allowed'] ?? null),
+            isYcMarketingCommunicationsAllowed: self::flag($data['is_yc_newsletter_allowed'] ?? null),
             isYcPersonalDataProcessingAllowed: self::flag($data['is_yc_personal_data_processing_allowed'] ?? null),
         );
     }

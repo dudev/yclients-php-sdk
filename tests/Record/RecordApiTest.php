@@ -79,7 +79,7 @@ final class RecordApiTest extends TestCase
 
         self::assertNotNull($record->clientAgreements);
         self::assertSame(245501024, $record->clientAgreements->clientId);
-        self::assertFalse($record->clientAgreements->isNewsletterAllowed);
+        self::assertFalse($record->clientAgreements->isMarketingCommunicationsAllowed);
         self::assertTrue($record->clientAgreements->isPersonalDataProcessingAllowed);
     }
 
