@@ -37,6 +37,14 @@ final class ClientTest extends TestCase
     }
 
     #[Test]
+    public function aBirthDateIsAPlainDateAtMidnightNotTheTimeOfParsing(): void
+    {
+        $client = Client::fromArray(['id' => 1, 'name' => 'Милана', 'birth_date' => '1990-05-17']);
+
+        self::assertSame('1990-05-17 00:00:00', $client->birthDate?->format('Y-m-d H:i:s'));
+    }
+
+    #[Test]
     public function itParsesLastChangeDateInBothOffsetForms(): void
     {
         $compact = Client::fromArray(['id' => 1, 'name' => 'Милана', 'last_change_date' => '2026-10-22T20:01:19+0400']);

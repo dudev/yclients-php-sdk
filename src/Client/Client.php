@@ -125,7 +125,7 @@ final readonly class Client
             return null;
         }
 
-        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $value);
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 
         return $date !== false ? $date : null;
     }
